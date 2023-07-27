@@ -73,7 +73,7 @@ export class MessagesService {
       data: {
         room: { connect: { RoomId: roomId } },
         member: { connect: { UserId: userId } },
-        Role: 'Owner', //member
+        Role: 'Owner', //member //admin
         isBanned:  false,
         isMuted:  false,
       },
@@ -334,6 +334,7 @@ async getMessage(roomid : number) {
 }
 
 async getRooms(userid: string) {
+
   const messages = await this.prisma.room.findMany({
     where: {
       members: {
@@ -341,8 +342,51 @@ async getRooms(userid: string) {
           UserId: userid,
         },
       },
+      ischannel : true,
+    },
+    include: {
+      Message :{
+        orderBy :{
+          SendTime : 'desc',
+        },
+        take : 1
+      },
     },
   });
+  return messages;
+}
+async getroomsdms(userid: string)
+{
+  const messages = await this.prisma.room.findMany({
+    where: {
+      members: {
+        some: {
+          UserId: userid,
+        },
+      },
+      ischannel : false,
+    },
+    include: {
+      Message :{
+        orderBy :{
+          SendTime : 'desc',
+        },
+        take : 1
+      },
+      members: {
+        include : {
+          member: {
+            select:{
+              avatar : true,
+              username: true,
+              status: true,
+            },
+          },
+        },
+      },
+    },
+
+  })
   return messages;
 }
 
