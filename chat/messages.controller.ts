@@ -105,7 +105,13 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
     async getRooms(@Req() req) {
       const userId = req.user.UserId;
       const messages = await this.messagesservice.getRooms(userId);
-      const msg= messages.map(room => ({
+
+      if (messages === null) {
+        return { message: 'u re banned' };
+      }
+      const otherrooms = messages.filter(room => !room.isBanned);
+
+      const msg= otherrooms.map(room => ({
         name: room.RoomNAme,
         lastMessage: room.Message.length > 0 ? {
         content: room.Message[0].Content,
