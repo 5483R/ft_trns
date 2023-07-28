@@ -16,7 +16,7 @@ export class RoomsController {
     constructor(private readonly messagesservice: MessagesService) {}
 
 
-    @Post('/create')
+@Post('/create')
 async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemebrs, @Req() req) {
   const { room } = createRoomWithMembers;
 
@@ -69,7 +69,7 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
         };
     } 
 //should be admin or owner
-    @Post(':roomId/mute/:membershipid')
+    @Post(':roomId/mute/:membershipid') //should impliment with socket
     async muteMember(@Req() req, @Param('membershipid', ParseIntPipe) membershipid: number, @Param('roomId', ParseIntPipe) roomId: number ) {
     
       await this.messagesservice.muteMember(req.user.UserId, membershipid, roomId);
@@ -77,7 +77,7 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
       return { message: 'Member muted' };
     };
 //should be admin or owner
-    @Post(':roomId/ban/:membershipid')
+    @Post(':roomId/ban/:membershipid') //should impliment with socket
     async BannedMember(@Req() req, @Param('membershipid', ParseIntPipe) membershipid: number, @Param('roomId', ParseIntPipe) roomId: number ) {
     
       await this.messagesservice.BannedMember(req.user.UserId, membershipid, roomId);
@@ -85,7 +85,7 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
       return { message: 'Member banned' };
     };
 
-    @Post(':roomId/umute/:membershipid')
+    @Post(':roomId/umute/:membershipid') // should impliment with socket 
     async ummuteMember(@Req() req, @Param('membershipid', ParseIntPipe) membershipid: number, @Param('roomId', ParseIntPipe) roomId: number ) {
     
       await this.messagesservice.unmuteMember(req.user.UserId, membershipid, roomId);
@@ -93,7 +93,7 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
       return { message: 'Member unmuted' };
     };
 //should be admin or owner
-    @Post(':roomId/unban/:membershipid')
+    @Post(':roomId/unban/:membershipid') //should impliment with socket
     async unBannedMember(@Req() req, @Param('membershipid', ParseIntPipe) membershipid: number, @Param('roomId', ParseIntPipe) roomId: number ) {
     
       await this.messagesservice.unBannedMember(req.user.UserId, membershipid, roomId);
@@ -105,13 +105,12 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
     async getRooms(@Req() req) {
       const userId = req.user.UserId;
       const messages = await this.messagesservice.getRooms(userId);
-    const msg= messages.map(room => ({
+      const msg= messages.map(room => ({
         name: room.RoomNAme,
         lastMessage: room.Message.length > 0 ? {
         content: room.Message[0].Content,
       } : null,
     }));
-
     return msg;
     }
 
@@ -122,24 +121,28 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
       const msg= messages.map(room => ({
         name: room.members[1].member.username,
         status: room.members[1].member.status,
+        avatar: room.members[1].member.avatar,
         lastMessage: room.Message.length > 0 ? {
         content: room.Message[0].Content,
-        avatar: room.members[1].member.avatar,
       } : null,
-      }
-      )
-      );
+      }));
       return msg;
     }
-    // @Post('joinroom/:roomId')
-    // async joinexistedroom(@Req() req, @Param('roomId', ParseIntPipe) roomId: number) {
-      
-    //     const joinroom = await this.joinexistedroom(req.user.UserId, roomId);
-    //     return {
-    //       membership: joinroom,
-    //       message: 'U re joined',
-    //     };
-    // } 
+
+
+    @Post('joinroom/:roomId')
+    async joinroom(@Req() req, @Param('roomId', ParseIntPipe) roomId: number, @Param('password') password : string) {
+      const joinroom = await this.joinroom(req.user.UserId, roomId, password);
+        if(!joinroom)
+        {
+          return { message: 'deja nta member or password incorrect' };
+        }
+       
+        return {
+          membership: joinroom,
+          message: 'U re joined',
+        };
+    } 
     
   }
 

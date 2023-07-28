@@ -159,6 +159,38 @@ async kickFromRoom(roomId: number, userId: string, userIDmin : string) {
 }
 
 async leaveRoom(roomId: number, userId: string) {
+const membership = await this.prisma.membership.findFirst({
+    where: {
+      AND: [
+        { RoomId: roomId },
+        { UserId: userId},
+      ],
+    },
+  });
+  if(!membership)
+    return {message : 'membership doesnt found'};
+  if(membership.Role === 'Owner')
+  {
+    const roommembers = await this.prisma.membership.findMany({
+      where :{
+        RoomId : roomId,
+      },
+    });
+
+    if(roommembers.length > 1)
+    {
+      const membersfindinroom = roommembers.filter((member) => member.UserId !== userId);
+      const randomuser = Math.floor(Math.random() * membersfindinroom.length);
+      const newowner = membersfindinroom[randomuser];
+      await this.prisma.membership.update({
+        where: { 
+          MembershipId: newowner.MembershipId
+         },
+        data: { 
+          Role: 'Owner' },
+      });
+    }
+  }
   await this.prisma.membership.deleteMany({
     where: {
       RoomId: roomId,
@@ -265,6 +297,13 @@ async BannedMember(userId: string,  membershipId: number, roomid: number) {
       isBanned: true,
     },
   });
+  await this.prisma.membership.deleteMany({
+    where: {
+      RoomId: roomid,
+      UserId: userId,
+    },
+  });
+  
 }
 
 async unmuteMember(userId: string,  membershipId: number, roomid: number) {
@@ -352,7 +391,9 @@ async getRooms(userid: string) {
         take : 1
       },
     },
-  });
+  })
+  if(messages[userid].isBanned)
+      return null;
   return messages;
 }
 async getroomsdms(userid: string)
@@ -392,20 +433,60 @@ async getroomsdms(userid: string)
 
 
 
-// async joinexistedroom(req.user.UserId, roomId)
+async joinroom(userid :string, roomid: number, password : string) {
+  const userexist = await this.prisma.membership.findFirst({
+    where: {
+      UserId: userid,
+      RoomId: roomid, 
+    },
+  });
 
-// async joinroom(roomid: string) {
-//   const messages = await this.prisma.room.findMany({
-//     where: {
-//       members: {
-//         some: {
-//           UserId: userid,
-//         },
-//       },
-//     },
-//   });
-//   return messages;
-// }
+  if (userexist) {
+    return null;
+  }
+  const room = await this.prisma.room.findUnique({
+    where : {
+      RoomId : roomid,
+    },
+  });
+  if(!room)
+    return {message: 'room mnot found'};
+  if(room[userid].isBanned)
+      return {
+        message: 'U re banned to join this room',
+      };
+  if(room.Type === 'protected')
+  {
+    const joinpprivateroom = await this.checkpassword(roomid, password);
+      if(!joinpprivateroom)
+        return null
+  }
 
+  const join = await this.prisma.membership.create({
+    data : {
+      UserId: userid,
+      RoomId: roomid,
+      Role: 'member',
+      isBanned: false,
+      isMuted: false,  
+    },
+  });
+
+  return join;
 }
-
+async checkpassword(roomid : number, password: string){
+  const room = await this.prisma.room.findUnique({
+    where :{
+      RoomId : roomid,
+    },
+  });
+  if(room.Type !== 'protected'){
+    return false
+  }
+    if(room.Password !== password)
+      return false
+    else{
+      return room.Password === password;
+    }
+  }
+}
