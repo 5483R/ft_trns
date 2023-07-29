@@ -30,6 +30,12 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
         return false;
     return true;
 }
+  @Get(':roomId/RoomData')
+  async RoomData(@Req() req, @Param('roomId', ParseIntPipe) roomId: number)
+  {
+      return await this.messagesservice.RoomData(req.user, roomId);
+  }
+
 
     @Get(':roomId/messages/')
     async getMessagesByRoomId(@Param('roomId', ParseIntPipe) roomId: number) {
@@ -51,7 +57,7 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
       }
 
     @Delete(':roomId/leave/:userId')
-    async leaveRoom(@Req() req, @Param('roomId', ParseIntPipe) roomId: number, @Param('userId') userId: string,) {
+    async leaveRoom(@Req() req, @Param('roomId', ParseIntPipe) roomId: number,) {
         await this.messagesservice.leaveRoom(roomId, req.user.UserId);
         return { message: 'Leaved Room' };
     }
@@ -92,6 +98,13 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
 
       return { message: 'Member unmuted' };
     };
+      @Post(':roomId/setadmin/:membershipid') // should impliment with socket 
+      async setadmin(@Req() req, @Param('membershipid', ParseIntPipe) membershipid: number, @Param('roomId', ParseIntPipe) roomId: number ) {
+    
+      await this.messagesservice.setadmin(req.user.UserId, membershipid, roomId);
+
+      return { message: 'user is admin now' };
+    };
 //should be admin or owner
     @Post(':roomId/unban/:membershipid') //should impliment with socket
     async unBannedMember(@Req() req, @Param('membershipid', ParseIntPipe) membershipid: number, @Param('roomId', ParseIntPipe) roomId: number ) {
@@ -104,15 +117,17 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
     @Get('/rooms')
     async getRooms(@Req() req) {
       const userId = req.user.UserId;
-      const messages = await this.messagesservice.getRooms(userId);
+      const rooms = await this.messagesservice.getRooms(userId);
 
-      if (messages === null) {
+      if (rooms === null) {
         return { message: 'u re banned' };
       }
-      const otherrooms = messages.filter(room => !room.isBanned);
+      // const otherrooms = rooms.filter(room => room['members']?.some(member => member.UserId === userId && !member.isBanned));
 
-      const msg= otherrooms.map(room => ({
+      const msg = rooms.map(room => ({
+        type: room.Type,
         name: room.RoomNAme,
+        roomid: room.RoomId,
         lastMessage: room.Message.length > 0 ? {
         content: room.Message[0].Content,
       } : null,
@@ -120,35 +135,51 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
     return msg;
     }
 
+
     @Get('/dms')
-    async getdms(@Req() req) {  
+    async getdms(@Req() req) {
       const userId = req.user.UserId;
       const messages = await this.messagesservice.getroomsdms(userId);
-      const msg= messages.map(room => ({
-        name: room.members[1].member.username,
-        status: room.members[1].member.status,
-        avatar: room.members[1].member.avatar,
+      const msg = messages.map(room => ({
+        name: room.members[0].member.UserId === req.user.UserId ? room.members[1].member.username : room.members[0].member.username,
+        avatar: room.members[0].member.UserId === req.user.UserId ? room.members[1].member.avatar : room.members[0].member.avatar,
+        status: room.members[0].member.UserId === req.user.UserId ? room.members[1].member.status : room.members[0].member.status,
+        userid: room.members[0].member.UserId === req.user.UserId ? room.members[1].member.UserId : room.members[0].member.UserId,
+        roomid: room.Message[0].RoomId,
         lastMessage: room.Message.length > 0 ? {
-        content: room.Message[0].Content,
-      } : null,
-      }));
+          content: room.Message[0].Content,
+        } : null,
+      }
+      )
+      );
       return msg;
     }
 
+    @Post('checkmember/:roomId')
+    async checkismember(@Req() req, @Param('roomId', ParseIntPipe) roomId : number)
+    {
+      const userId = req.user.UserId;
+      const checkroomsmember = await this.messagesservice.checkmembership(roomId, userId);
+      return checkroomsmember;
+    }
 
-    @Post('joinroom/:roomId')
+    @Post(':roomId/joinroom')
     async joinroom(@Req() req, @Param('roomId', ParseIntPipe) roomId: number, @Param('password') password : string) {
-      const joinroom = await this.joinroom(req.user.UserId, roomId, password);
-        if(!joinroom)
-        {
-          return { message: 'deja nta member or password incorrect' };
+      const joinroom = await this.messagesservice.joinroom(req.user.UserId, roomId, password);
+
+      if(!joinroom)
+      {
+          //console.log(userId)
+          return { message: 'deja nta member or password incorrect',
+          is : false,
+          };
         }
-       
         return {
+          is : true,
           membership: joinroom,
           message: 'U re joined',
         };
-    } 
+    }
     
   }
 
