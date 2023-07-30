@@ -219,10 +219,6 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
 
 
 
-
-    //get messages base on room id 
-    //delete group  base on room id {1-delete membrships+ 2-delete messages + 3-delete room}
-    //kick from group
-    //add membership
-    //quite group
-    //send message(store on database)
+// update leave room 
+// update kickuser , fixing couldnt kick a owner
+// create new endpoint for updating and removing and setting password

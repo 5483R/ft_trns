@@ -152,6 +152,16 @@ async kickFromRoom(roomId: number, userId: string, userIDmin : string) {
   if (membership.Role !== 'Owner' && membership.Role !== 'Admin') {
     throw new UnauthorizedException('u dont have the right to kick');
   }
+  const membershipgonnakicked = await this.prisma.membership.findFirst({
+    where: {
+      AND: [
+        { RoomId: roomId },
+        { UserId: userId},
+      ],
+    },
+  });
+  if(membershipgonnakicked.Role ==='Owner')
+      throw new UnauthorizedException('u dont have the right to kick the owner of room');
 
   await this.prisma.membership.deleteMany({
     where: {
@@ -192,6 +202,10 @@ const membership = await this.prisma.membership.findFirst({
         data: { 
           Role: 'Owner' },
       });
+    }
+    else{
+      const deletethisroom = this.deleteRoom(roomId, userId);
+        return deletethisroom;
     }
   }
   await this.prisma.membership.deleteMany({
@@ -755,7 +769,13 @@ async checkpassword(roomid : number, password: string){
         where: {
           RoomId: roomId,
         },
-        include: {
+        select: {
+          RoomId : true,
+          RoomNAme: true,
+          CreationTime: true,
+          updateTime: true,
+          ischannel: true,
+          Type: true,
           members: true,
         },
       });
