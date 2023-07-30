@@ -8,6 +8,7 @@ import { ApiTags } from "@nestjs/swagger";
 
 
 
+
  
 @Controller('room')
 @UseGuards(JwtAuthGuard)
@@ -164,23 +165,54 @@ async createRoomAndMembership(@Body() createRoomWithMembers: CreateRoomwithMemeb
     }
 
     @Post(':roomId/joinroom')
-    async joinroom(@Req() req, @Param('roomId', ParseIntPipe) roomId: number, @Param('password') password : string) {
+    async joinroom(@Req() req, @Param('roomId', ParseIntPipe) roomId: number, @Body('password') password : string) {
       const joinroom = await this.messagesservice.joinroom(req.user.UserId, roomId, password);
 
       if(!joinroom)
-      {
-          //console.log(userId)
-          return { message: 'deja nta member or password incorrect',
-          is : false,
-          };
+        return { message: 'You are already a member of this room or the room was not found', is: false };
+      if ('message' in joinroom && joinroom['message'] === 'Password is incorrect') {
+          return { message: 'Password is incorrect', is: false };
         }
+
         return {
           is : true,
           membership: joinroom,
           message: 'U re joined',
         };
     }
-    
+    @Post(':roomId/setpassword')
+    async setpassword(@Req() req, @Param('roomId', ParseIntPipe) roomId:number, @Body('password') password: string ){
+      const setpassword = await this.messagesservice.setpassword(req.user.UserId, roomId, password);
+      return setpassword;
+    }
+    @Post(':roomId/removepassword')
+    async removepassword(@Req() req, @Param('roomId', ParseIntPipe) roomId:number, @Body('password') password: string ){
+      const removepassword = await this.messagesservice.removepassword(req.user.UserId, roomId, password);
+      if(!removepassword)
+      {
+        return { message: 'password incorrect',
+        is : false,
+        };
+      }
+      return removepassword;
+    }
+    @Post(':roomId/updatepassword')
+    async updatepassword(@Req() req, @Param('roomId', ParseIntPipe) roomId:number, @Body('oldpassword') oldpassword: string,  @Body('password') password: string ){
+      const updatepassword = await this.messagesservice.updatepassword(req.user.UserId, roomId, oldpassword, password);
+      if(!updatepassword)
+      {
+        return { message: 'password incorrect',
+        is : false,
+        };
+      }
+      return updatepassword;
+    }
+
+    @Get(':roomId/getdetails')
+    async getroomdetails(@Param('roomId', ParseIntPipe) roomId:number){
+      const getroomdetails = await this.messagesservice.getroomdetails(roomId);
+      return getroomdetails;
+    }
   }
 
 

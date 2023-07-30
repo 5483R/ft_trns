@@ -7,6 +7,8 @@ import { CreateMembershipDto, CreateRoomDto } from './dto/room.dto';
 import { StringDecoder } from 'string_decoder';
 import * as bcrypt from 'bcrypt'
 import { info } from 'console';
+import { Server } from 'socket.io';
+import { Socket } from 'dgram';
  
 @Injectable()
 export class MessagesService {
@@ -326,13 +328,6 @@ async BannedMember(userId: string,  membershipId: number, roomid: number) {
       isBanned: true,
     },
   });
-  await this.prisma.membership.deleteMany({
-    where: {
-      RoomId: roomid,
-      UserId: userId,
-    },
-  });
-  
 }
 
 async unmuteMember(userId: string,  membershipId: number, roomid: number) {
@@ -550,7 +545,7 @@ async getroomsdms(userid: string)
 
 
 async joinroom(userid :string, roomid: number, password : string) {
-  
+  console.log(password)
   const userexist = await this.prisma.membership.findFirst({
     where: {
       UserId: userid,
@@ -558,7 +553,8 @@ async joinroom(userid :string, roomid: number, password : string) {
     },
   });
   if (userexist) {
-    return null;
+    return { message: 'u are already a member of this room',
+     is: false };
   }
 
   const room = await this.prisma.room.findUnique({
@@ -567,15 +563,13 @@ async joinroom(userid :string, roomid: number, password : string) {
     },
   });
   if(!room)
-    return {message: 'room mnot found'};
-    
-  // if(userexist.isBanned)
-  //     return {
-  //       message: 'U re banned to join this room',
-  //     };
+    return {
+      message: 'room mnot found',
+      is : false
+    };
   if(room.Type === 'protected')
   {
-    const joinpprivateroom = await this.checkpassword(room.RoomId, room.Password);
+    const joinpprivateroom = await bcrypt.compare(password, room.Password);;
       if(!joinpprivateroom)
         return { message : 'Password is incorrect'};
   }
@@ -599,6 +593,7 @@ async checkpassword(roomid : number, password: string){
       RoomId : roomid,
     },
   });
+  console.log(room.Password)
   if(room.Type !== 'protected'){
     return false
   }
@@ -617,6 +612,156 @@ async checkpassword(roomid : number, password: string){
     });
     return !!membership;
   }
+
+
+  async setpassword(userId : string, roomId : number , password : string){
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        AND: [
+          { RoomId: roomId },
+          { UserId: userId },
+        ],
+      },
+    });
+    if(!password)
+      throw new NotFoundException ('password makaynch');
+    if(!membership)
+    throw new UnauthorizedException('Membership doesnt exist');
+  
+    if (membership.Role !== 'Owner') {
+      throw new UnauthorizedException('u dont have the right to setpassword');
+    }
+
+    const room = await this.prisma.room.findUnique({
+      where :{
+        RoomId : roomId,
+      },
+    });
+    if(room.Type === 'protected'){
+      return false;
+    }
+    
+    const hashedPassword = await bcrypt.hash(password, 10);
+      await this.prisma.room.update({
+        where: {
+          RoomId: roomId,
+        },
+        data: {
+          Password: hashedPassword,
+          Type: 'protected',
+        },
+      });
+      return true;
+    }
+    async removepassword(userId : string, roomId : number , password : string){
+      const membership = await this.prisma.membership.findFirst({
+        where: {
+          AND: [
+            { RoomId: roomId },
+            { UserId: userId },
+          ],
+        },
+      });
+      if(!membership)
+      throw new UnauthorizedException('Membership doesnt exist');
+    
+      if (membership.Role !== 'Owner') {
+        throw new UnauthorizedException('u dont have the right to removepassword');
+      }
+      
+  
+      const room = await this.prisma.room.findUnique({
+        where :{
+          RoomId : roomId,
+        },
+      });
+      if(room.Type === 'protected')
+      {
+        const joinpprivateroom = await this.checkpassword(room.RoomId, room.Password);
+          if(!joinpprivateroom)
+            return {
+              is: false,
+              message : 'Password is incorrect'
+            };
+      }
+      if(room.Type !== 'protected'){
+        return false;
+      }
+      if(!room.Password){
+        return false;
+      }
+        await this.prisma.room.update({
+          where: {
+            RoomId: roomId,
+          },
+          data: {
+            Password: '',
+            Type: 'public',
+          },
+        });
+        return true;
+      }
+
+      async updatepassword(userId : string, roomId : number ,oldpassword : string,  password : string){
+        const membership = await this.prisma.membership.findFirst({
+          where: {
+            AND: [
+              { RoomId: roomId },
+              { UserId: userId },
+            ],
+          },
+        });
+        if(!password)
+            throw new NotFoundException ('password makaynch');
+        if(!membership)
+        throw new UnauthorizedException('Membership doesnt exist');
+      
+        if (membership.Role !== 'Owner') {
+          throw new UnauthorizedException('u dont have the right to removepassword');
+        }
+    
+        const room = await this.prisma.room.findUnique({
+          where :{
+            RoomId : roomId,
+          },
+        });
+        if(room.Type !== 'protected'){
+          return false;
+        }
+        if(room.Type === 'protected')
+        {
+        const joinpprivateroom = await this.checkpassword(room.RoomId, oldpassword);
+          if(!joinpprivateroom)
+            return {
+              is: false,
+              message : 'Password is incorrect'
+            };
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+          await this.prisma.room.update({
+            where: {
+              RoomId: roomId,
+            },
+            data: {
+              Password: hashedPassword,
+            },
+          });
+          return true;
+        }
+
+    async getroomdetails(roomId : number)
+    {
+      const roomDetails = await this.prisma.room.findUnique({
+        where: {
+          RoomId: roomId,
+        },
+        include: {
+          members: true,
+        },
+      });
+      return roomDetails
+    }
+      
 }
 
 
